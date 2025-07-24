@@ -291,4 +291,4 @@ if __name__ == "__main__":
                 st.error("Input tidak valid. Harap masukkan angka bulat. 🔢")
         else:
             st.warning("Harap masukkan jumlah periode simulasi terlebih dahulu. ⚠️")
-�
+
