@@ -26,14 +26,13 @@ PLOT_COLORS = {
 
 def clean_interval_string(interval_str):
     """
-    Membersihkan dan menstandarkan format string interval (misal: '103â-130' menjadi '103-130').
+    Membersihkan dan menstandarkan format string interval.
     """
     return str(interval_str).replace('â', '-').replace('–', '-').replace('—', '-').replace(' ', '').replace(',', '')
 
 def parse_interval(interval_str):
     """
-    Mengurai string interval 'a-b' dan mengembalikan tuple (a, b) dalam bentuk integer.
-    Mengembalikan (None, None) jika terjadi error parsing.
+    Mengurai string interval 'a-b' dan mengembalikan tuple (a, b).
     """
     try:
         a, b = map(int, interval_str.split('-'))
@@ -43,10 +42,10 @@ def parse_interval(interval_str):
 
 # --- Fungsi Pemuatan dan Pra-pemrosesan Data ---
 
-@st.cache_data # Menggunakan cache Streamlit untuk mempercepat pemuatan data Excel
+@st.cache_data
 def load_distribusi_from_excel(file_path):
     """
-    Memuat data distribusi golongan darah dari file Excel.
+    Memuat data distribusi dari satu file Excel.
     """
     try:
         df = pd.read_excel(file_path)
@@ -59,10 +58,10 @@ def load_distribusi_from_excel(file_path):
         st.error(f"Terjadi kesalahan saat memuat {file_path}: {e}")
         return pd.DataFrame()
 
-@st.cache_data # Menggunakan cache Streamlit untuk mempercepat pemuatan semua distribusi
+@st.cache_data
 def load_all_distributions(_file_paths):
     """
-    Memuat data distribusi untuk semua golongan darah yang ditentukan.
+    Memuat data distribusi untuk semua golongan darah.
     """
     distribusi_dict = {}
     for gol, path in _file_paths.items():
@@ -76,24 +75,19 @@ def load_all_distributions(_file_paths):
 
 def display_distribution_table(df, golongan):
     """
-    Menampilkan tabel distribusi yang diformat untuk golongan darah tertentu di Streamlit.
+    Menampilkan tabel distribusi yang telah diolah di Streamlit.
     """
-    st.subheader(f"Tabel Distribusi Golongan Darah {golongan} 📋")
+    st.subheader(f"Tabel Distribusi Golongan Darah {golongan} �")
     
     display_df = df.copy()
     
-    # Hitung dan tambahkan kolom 'Titik Tengah'
     midpoints = []
     for _, row in display_df.iterrows():
         interval = clean_interval_string(row['Interval Kelas '])
         a, b = parse_interval(interval)
-        if a is not None and b is not None:
-            midpoints.append(math.ceil((a + b) / 2))
-        else:
-            midpoints.append(None)
+        midpoints.append(math.ceil((a + b) / 2) if a is not None and b is not None else None)
     display_df['Titik Tengah'] = midpoints
 
-    # Siapkan kolom 'Interval Angka Acak'
     display_df['Interval Angka Acak'] = ""
     lower_bound = 0
     for i, row in display_df.iterrows():
@@ -101,26 +95,17 @@ def display_distribution_table(df, golongan):
         display_df.loc[i, 'Interval Angka Acak'] = f"{str(lower_bound).zfill(2)} - {str(upper_bound).zfill(2)}"
         lower_bound = upper_bound + 1
     
-    # Bersihkan string interval dan ganti nama kolom
     display_df['Interval Kelas '] = display_df['Interval Kelas '].apply(clean_interval_string)
-    display_df = display_df.rename(columns={
-        'Interval Kelas ': 'Interval Kelas',
-        'Prob Kumulatif ': 'Prob Kumulatif'
-    })
+    display_df = display_df.rename(columns={'Interval Kelas ': 'Interval Kelas', 'Prob Kumulatif ': 'Prob Kumulatif'})
     
-    # Tentukan urutan kolom yang akan ditampilkan
-    cols_to_display = [
-        'No', 'Interval Kelas', 'Frekuensi', 'Probabilitas', 'Prob Kumulatif',
-        'Prob Kumulatif * 100', 'Titik Tengah', 'Interval Angka Acak'
-    ]
-    
+    cols_to_display = ['No', 'Interval Kelas', 'Frekuensi', 'Probabilitas', 'Prob Kumulatif', 'Prob Kumulatif * 100', 'Titik Tengah', 'Interval Angka Acak']
     st.dataframe(display_df[cols_to_display], hide_index=True)
 
 # --- Logika Simulasi ---
 
 def get_simulation_value(df, random_number):
     """
-    Menentukan nilai simulasi berdasarkan angka acak dan distribusi yang diberikan.
+    Menentukan nilai simulasi berdasarkan angka acak.
     """
     lower_bound = 0
     for _, row in df.iterrows():
@@ -128,46 +113,36 @@ def get_simulation_value(df, random_number):
         if lower_bound <= random_number <= upper_bound:
             interval = clean_interval_string(row['Interval Kelas '])
             a, b = parse_interval(interval)
-            if a is not None and b is not None:
-                return math.ceil((a + b) / 2)
-            else:
-                return 0
+            return math.ceil((a + b) / 2) if a is not None and b is not None else 0
         lower_bound = upper_bound + 1
     return 0
 
-@st.cache_data # Menggunakan cache untuk hasil simulasi agar lebih cepat jika inputnya sama
+@st.cache_data
 def run_monte_carlo_simulation(_distribusi_dict, num_simulations):
     """
-    Menjalankan simulasi Monte Carlo untuk pemakaian darah.
+    Menjalankan simulasi Monte Carlo.
     """
     simulation_results = []
     progress_text = "Simulasi sedang berjalan. Mohon tunggu. ⏳"
     my_bar = st.progress(0, text=progress_text)
 
     for i in range(num_simulations):
-        a_acak = random.randint(0, 99)
-        b_acak = random.randint(0, 99)
-        ab_acak = random.randint(0, 99)
-        o_acak = random.randint(0, 99)
-
-        sim_a = get_simulation_value(_distribusi_dict.get('A', pd.DataFrame()), a_acak)
-        sim_b = get_simulation_value(_distribusi_dict.get('B', pd.DataFrame()), b_acak)
-        sim_ab = get_simulation_value(_distribusi_dict.get('AB', pd.DataFrame()), ab_acak)
-        sim_o = get_simulation_value(_distribusi_dict.get('O', pd.DataFrame()), o_acak)
-
-        total_sim = sim_a + sim_b + sim_ab + sim_o
-        pa = (sim_a / total_sim * 100) if total_sim else 0
-        pb = (sim_b / total_sim * 100) if total_sim else 0
-        pab = (sim_ab / total_sim * 100) if total_sim else 0
-        po = (sim_o / total_sim * 100) if total_sim else 0
-
-        simulation_results.append({
-            'Periode': i + 1, 'Angka Acak A': a_acak, 'Angka Acak B': b_acak,
-            'Angka Acak AB': ab_acak, 'Angka Acak O': o_acak, 'Simulasi A': sim_a,
-            'Simulasi B': sim_b, 'Simulasi AB': sim_ab, 'Simulasi O': sim_o,
-            'Total Simulasi': total_sim, 'Pmk A%': pa, 'Pmk B%': pb,
-            'Pmk AB%': pab, 'Pmk O%': po
-        })
+        sim_values = {gol: get_simulation_value(_distribusi_dict.get(gol, pd.DataFrame()), random.randint(0, 99)) for gol in FILE_PATHS}
+        total_sim = sum(sim_values.values())
+        
+        row_data = {
+            'Periode': i + 1,
+            'Angka Acak A': random.randint(0, 99), 'Angka Acak B': random.randint(0, 99),
+            'Angka Acak AB': random.randint(0, 99), 'Angka Acak O': random.randint(0, 99),
+            'Simulasi A': sim_values.get('A', 0), 'Simulasi B': sim_values.get('B', 0),
+            'Simulasi AB': sim_values.get('AB', 0), 'Simulasi O': sim_values.get('O', 0),
+            'Total Simulasi': total_sim,
+            'Pmk A%': (sim_values.get('A', 0) / total_sim * 100) if total_sim else 0,
+            'Pmk B%': (sim_values.get('B', 0) / total_sim * 100) if total_sim else 0,
+            'Pmk AB%': (sim_values.get('AB', 0) / total_sim * 100) if total_sim else 0,
+            'Pmk O%': (sim_values.get('O', 0) / total_sim * 100) if total_sim else 0,
+        }
+        simulation_results.append(row_data)
         my_bar.progress((i + 1) / num_simulations, text=progress_text)
         
     my_bar.empty()
@@ -177,7 +152,7 @@ def run_monte_carlo_simulation(_distribusi_dict, num_simulations):
 
 def perform_summary_analysis(sim_df):
     """
-    Melakukan dan menampilkan statistik ringkasan dari simulasi.
+    Menampilkan statistik ringkasan dari simulasi.
     """
     summary_stats = sim_df[['Simulasi A', 'Simulasi B', 'Simulasi AB', 'Simulasi O', 'Total Simulasi']].agg(['mean', 'std', 'min', 'max']).transpose()
     summary_stats.columns = ['Rata-rata', 'Standar Deviasi', 'Minimum', 'Maksimum']
@@ -189,27 +164,21 @@ def perform_summary_analysis(sim_df):
 
     st.markdown(f"### Periode dengan Total Pemakaian Tertinggi 📈:")
     st.markdown(f"Periode **{int(max_total_usage_period['Periode'])}** (Total: **{int(max_total_usage_period['Total Simulasi'])}** kantong)")
-    st.markdown(f"Komposisi: A={int(max_total_usage_period['Simulasi A'])}, B={int(max_total_usage_period['Simulasi B'])}, AB={int(max_total_usage_period['Simulasi AB'])}, O={int(max_total_usage_period['Simulasi O'])}")
 
     st.markdown(f"### Periode dengan Total Pemakaian Terendah 📉:")
     st.markdown(f"Periode **{int(min_total_usage_period['Periode'])}** (Total: **{int(min_total_usage_period['Total Simulasi'])}** kantong)")
-    st.markdown(f"Komposisi: A={int(min_total_usage_period['Simulasi A'])}, B={int(min_total_usage_period['Simulasi B'])}, AB={int(min_total_usage_period['Simulasi AB'])}, O={int(min_total_usage_period['Simulasi O'])}")
 
 def provide_decision_insights(sim_df):
     """
-    Memberikan wawasan dan rekomendasi untuk pengambil keputusan.
+    Memberikan wawasan dan rekomendasi.
     """
     st.header("💡 WAWASAN & REKOMENDASI UNTUK PENGAMBIL KEPUTUSAN 🎯")
-    avg_usages = {
-        'A': sim_df['Simulasi A'].mean(), 'B': sim_df['Simulasi B'].mean(),
-        'AB': sim_df['Simulasi AB'].mean(), 'O': sim_df['Simulasi O'].mean()
-    }
+    avg_usages = {gol: sim_df[f'Simulasi {gol}'].mean() for gol in FILE_PATHS}
     sorted_avg_usages = sorted(avg_usages.items(), key=lambda item: item[1], reverse=True)
     total_avg_usage = sim_df['Total Simulasi'].mean()
 
     st.markdown(f"Dari hasil simulasi **{len(sim_df)} periode**:")
-    st.markdown(f"**1. Prediksi Kebutuhan Darah Secara Umum: 🩸**")
-    st.markdown(f"Rata-rata total pemakaian darah per periode adalah sekitar **{total_avg_usage:.0f} kantong**.")
+    st.markdown(f"**1. Prediksi Kebutuhan Darah Secara Umum: 🩸**\nRata-rata total pemakaian darah per periode adalah sekitar **{total_avg_usage:.0f} kantong**.")
     st.markdown(f"**2. Golongan Darah Paling Banyak dan Paling Sedikit Digunakan: 📊**")
     for blood_type, avg_usage in sorted_avg_usages:
         st.markdown(f"- **Golongan {blood_type}:** Rata-rata pemakaian sekitar **{avg_usage:.0f} kantong per periode**.")
@@ -222,24 +191,19 @@ def plot_blood_usage_bar_chart(sim_df, colors):
     """
     Menggambar grafik batang pemakaian darah per periode.
     """
-    fig, ax = plt.subplots(figsize=(20, 8)) # Ukuran disesuaikan
+    fig, ax = plt.subplots(figsize=(20, 8))
     bar_width = 0.2
-    r1 = np.arange(len(sim_df))
-    r2 = [x + bar_width for x in r1]
-    r3 = [x + bar_width * 2 for x in r1]
-    r4 = [x + bar_width * 3 for x in r1]
-
-    ax.bar(r1, sim_df['Simulasi A'], color=colors['A'], width=bar_width, edgecolor='black', label='Simulasi A')
-    ax.bar(r2, sim_df['Simulasi B'], color=colors['B'], width=bar_width, edgecolor='black', label='Simulasi B')
-    ax.bar(r3, sim_df['Simulasi AB'], color=colors['AB'], width=bar_width, edgecolor='black', label='Simulasi AB')
-    ax.bar(r4, sim_df['Simulasi O'], color=colors['O'], width=bar_width, edgecolor='black', label='Simulasi O')
+    r = np.arange(len(sim_df))
+    
+    for i, (gol, color) in enumerate(colors.items()):
+        ax.bar(r + i * bar_width, sim_df[f'Simulasi {gol}'], color=color, width=bar_width, edgecolor='black', label=f'Simulasi {gol}')
 
     ax.set_xlabel('Periode Simulasi', fontweight='bold', fontsize=12)
     ax.set_ylabel('Jumlah Pemakaian (kantong)', fontweight='bold', fontsize=12)
     ax.set_title('GRAFIK SIMULASI PEMAKAIAN DARAH PER PERIODE', fontweight='bold', fontsize=16)
     
     if len(sim_df) > 0:
-        ax.set_xticks([r + bar_width * 1.5 for r in range(len(sim_df))], labels=sim_df['Periode'], rotation=90, fontsize=8)
+        ax.set_xticks(r + bar_width * 1.5, labels=sim_df['Periode'], rotation=90, fontsize=8)
     
     ax.grid(axis='y', linestyle='--', alpha=0.7)
     ax.legend()
@@ -251,14 +215,10 @@ def plot_average_usage_pie_chart(sim_df, colors):
     Menggambar grafik pai rata-rata pemakaian darah.
     """
     fig, ax = plt.subplots(figsize=(6, 5))
-    avg_pemakaian = [
-        sim_df['Simulasi A'].mean(), sim_df['Simulasi B'].mean(),
-        sim_df['Simulasi AB'].mean(), sim_df['Simulasi O'].mean()
-    ]
-    labels = ['PEMAKAIAN A', 'PEMAKAIAN B', 'PEMAKAIAN AB', 'PEMAKAIAN O']
-    pie_colors = [colors['A'], colors['B'], colors['AB'], colors['O']] 
+    avg_pemakaian = [sim_df[f'Simulasi {gol}'].mean() for gol in colors]
+    labels = [f'PEMAKAIAN {gol}' for gol in colors]
     
-    ax.pie(avg_pemakaian, labels=labels, autopct='%1.1f%%', startangle=140, colors=pie_colors,
+    ax.pie(avg_pemakaian, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors.values(),
            wedgeprops={'edgecolor': 'black'}, textprops={'fontsize': 10})
     ax.set_title('RATA-RATA PEMAKAIAN SIMULASI DARAH PER GOLONGAN', fontweight='bold', fontsize=12)
     ax.axis('equal')
@@ -269,29 +229,23 @@ def plot_average_usage_pie_chart(sim_df, colors):
 if __name__ == "__main__":
     st.set_page_config(layout="wide", page_title="Simulasi Monte Carlo")
     
-    # Custom CSS
-    st.markdown("""
-        <style>
-            .main { background-color: #f0f2f6; }
-            h1, h2, h3 { text-align: center; }
-        </style>
-    """, unsafe_allow_html=True)
-
+    # --- BAGIAN BARU: Cek URL untuk refresh cache ---
+    if st.query_params.get("refresh") == "true":
+        st.cache_data.clear()
+        st.query_params.clear()
+        st.toast("Cache berhasil dihapus! Memuat data terbaru.", icon="✅")
+    
+    st.markdown("""<style>.main { background-color: #f0f2f6; } h1, h2, h3 { text-align: center; }</style>""", unsafe_allow_html=True)
     st.markdown("<h1>🩸 Simulasi Pemakaian Darah di UTD RSUD dr. Soekardjo Kota Tasikmalaya pada 2021-2023 dengan Simulasi Monte Carlo 🩸</h1>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # Tombol untuk membersihkan cache
-    if st.button("🔄 Hapus Cache & Muat Ulang Data dari Excel"):
-        st.cache_data.clear()
-        st.success("Cache berhasil dihapus! Data terbaru dari Excel akan dimuat pada proses selanjutnya.")
-        st.rerun()
+    # --- BAGIAN YANG DIHAPUS: Tombol refresh cache sudah tidak ada di sini ---
 
     # 1. Pemuatan Data Distribusi
     st.header("1. 📊 Data Distribusi Golongan Darah")
     distribusi_data = load_all_distributions(FILE_PATHS)
 
-    tab_titles = list(FILE_PATHS.keys())
-    tabs = st.tabs(tab_titles)
+    tabs = st.tabs(list(FILE_PATHS.keys()))
     for i, gol in enumerate(FILE_PATHS.keys()):
         with tabs[i]:
             if gol in distribusi_data and not distribusi_data[gol].empty:
@@ -303,10 +257,7 @@ if __name__ == "__main__":
     st.markdown("---")
     st.header("2. 🧪 Hasil Simulasi Monte Carlo")
     
-    num_simulations_str = st.text_input(
-        "Pilih Jumlah Periode Simulasi:", value="",
-        help="Masukkan jumlah periode simulasi (misal: 84, 120, 365)."
-    )
+    num_simulations_str = st.text_input("Pilih Jumlah Periode Simulasi:", value="", help="Masukkan jumlah periode simulasi (misal: 84, 120, 365).")
     
     if st.button('Jalankan Simulasi ▶️'):
         if num_simulations_str:
@@ -322,7 +273,7 @@ if __name__ == "__main__":
                     st.markdown("---")
                     st.header("3. 📈 Analisis dan Visualisasi")
                     
-                    col1, col2 = st.columns([3, 2]) # Buat 2 kolom, grafik batang lebih lebar
+                    col1, col2 = st.columns([3, 2])
                     with col1:
                         st.subheader("Grafik Pemakaian per Periode")
                         plot_blood_usage_bar_chart(simulation_df, PLOT_COLORS)
@@ -340,3 +291,4 @@ if __name__ == "__main__":
                 st.error("Input tidak valid. Harap masukkan angka bulat. 🔢")
         else:
             st.warning("Harap masukkan jumlah periode simulasi terlebih dahulu. ⚠️")
+�
