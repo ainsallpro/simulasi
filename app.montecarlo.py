@@ -77,7 +77,7 @@ def display_distribution_table(df, golongan):
     """
     Menampilkan tabel distribusi yang telah diolah di Streamlit.
     """
-    st.subheader(f"Tabel Distribusi Golongan Darah {golongan} �")
+    st.subheader(f"Tabel Distribusi Golongan Darah {golongan} ")
     
     display_df = df.copy()
     
