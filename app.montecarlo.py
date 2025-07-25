@@ -244,7 +244,7 @@ if __name__ == "__main__":
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<h1>🩸 Simulasi Pemakaian Darah di UTD RSUD dr. Soekardjo Kota Tasikmalaya pada 2021-2023 dengan Simulasi Monte Carlo 🩸</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>🩸 Simulasi Pemakaian Darah di UTD RSUD dr. Soekardjo Kota Tasikmalaya dengan Simulasi Monte Carlo 🩸</h1>", unsafe_allow_html=True)
     st.markdown("---")
 
     # 1. Pemuatan Data Distribusi
